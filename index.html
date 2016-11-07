@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+<head>
+    <h1>Missouri Population Density</h1>
+</head>
 <style>
 
 svg {
@@ -26,34 +29,58 @@ svg {
 }
 
 </style>
+
 <body>
+<button onclick="changeColor()">Change Color</button>  <!--Create button that calls function to change color -->
+<!--<label class = "switch">
+    <input type = "checkbox" onclick="makeBlue()">
+    <div class="slider round"></div>
+    </label>-->
 <script src="//d3js.org/d3.v3.min.js"></script>
 <script src="//d3js.org/topojson.v1.min.js"></script>
 <script>
 
 var width = 960,
-    height = 1100;
+    height = 800;
 
 var formatNumber = d3.format(",d");
-
-
 
 var projection = d3.geo.albers()
     .center([0, 30])
     .rotate([93, 0])
     .parallels([50, 60])
-    .scale(9000)
-    .translate([width / 2 - 100, height / 2 + 1200]);
+    .scale(9000)    //size of the map
+    .translate([width / 2 - 100, height / 2 + 1300]); //repositioning the map
     
 var path = d3.geo.path()
     .projection(projection);
     
-
 var color = d3.scale.threshold()
     .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
-    //.range(["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#b30000", "#7f0000"]);
+    .range(["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#b30000", "#7f0000"]);
     //.range(["#f8f9ff", "#a5b2f7", "#b5c1fa", "#90a2fb", "#5b76ff", "#3658ff", "#0d35fe", "#0221bb", "#010a37"]);
+    //.range(["#108926", "#159f2e", "#16df3a", "#60f26a", "#f6f66a", "#eaf908", "#f7812b", "#da4d07", "#da0707"]);
+    var count = 0;
+function changeColor() {
+    if(count % 3 == 0){
+    color = d3.scale.threshold()
+    .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
     .range(["#108926", "#159f2e", "#16df3a", "#60f26a", "#f6f66a", "#eaf908", "#f7812b", "#da4d07", "#da0707"]);
+    }
+    if(count % 3 == 1) {
+    color = d3.scale.threshold()
+    .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
+    .range(["#f8f9ff", "#a5b2f7", "#b5c1fa", "#90a2fb", "#5b76ff", "#3658ff", "#0d35fe", "#0221bb", "#010a37"]);
+    }
+    if(count % 3 == 2) {
+    color = d3.scale.threshold()
+    .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
+    .range(["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#b30000", "#7f0000"]);
+    }
+    console.log(count);
+    count++;
+    drawMap();
+}
 
 // A position encoding for the key only.
 var x = d3.scale.linear()
@@ -70,7 +97,62 @@ var xAxis = d3.svg.axis()
 var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
+    var g = svg.append("g")
+    .attr("class", "key")
+    .attr("transform", "translate(40,40)");
 
+g.selectAll("rect")
+    .data(color.range().map(function(d, i) {
+      return {
+        x0: i ? x(color.domain()[i - 1]) : x.range()[0],
+        x1: i < color.domain().length ? x(color.domain()[i]) : x.range()[1],
+        z: d
+      };
+    }))
+  .enter().append("rect")
+    .attr("height", 8)
+    .attr("x", function(d) { return d.x0; })
+    .attr("width", function(d) { return d.x1 - d.x0; })
+    .style("fill", function(d) { return d.z; });
+
+g.call(xAxis).append("text")
+    .attr("class", "caption")
+    .attr("y", -6)
+    .text("Population per square mile");
+
+d3.json("MO.json", function(error, mo) {
+  if (error) throw error;
+
+  var tracts = topojson.feature(mo, mo.objects.tracts);
+
+  // Clip tracts to land.
+  svg.append("defs").append("clipPath")
+      .attr("id", "clip-land")
+    .append("path")
+      .datum(topojson.feature(mo, mo.objects.counties))
+      .attr("d", path);
+
+  // Group tracts by color for faster rendering.
+  svg.append("g")
+      .attr("class", "tract")
+      .attr("clip-path", "url(#clip-land)")
+    .selectAll("path")
+      .data(d3.nest()
+        .key(function(d) { return color(d.properties.population / d.properties.area * 2.58999e6); })
+        .entries(tracts.features.filter(function(d) { return d.properties.area; })))
+    .enter().append("path")
+      .style("fill", function(d) { return d.key; })
+      .attr("d", function(d) { return path({type: "FeatureCollection", features: d.values}); });
+
+  // Draw county borders.
+  svg.append("path")
+      .datum(topojson.mesh(mo, mo.objects.counties, function(a, b) { return a !== b; }))
+      .attr("class", "county-border")
+      .attr("d", path);
+});
+    
+function drawMap()
+    {
 var g = svg.append("g")
     .attr("class", "key")
     .attr("transform", "translate(40,40)");
@@ -94,16 +176,16 @@ g.call(xAxis).append("text")
     .attr("y", -6)
     .text("Population per square mile");
 
-d3.json("MO.json", function(error, ca) {
+d3.json("MO.json", function(error, mo) {
   if (error) throw error;
 
-  var tracts = topojson.feature(ca, ca.objects.tracts);
+  var tracts = topojson.feature(mo, mo.objects.tracts);
 
   // Clip tracts to land.
   svg.append("defs").append("clipPath")
       .attr("id", "clip-land")
     .append("path")
-      .datum(topojson.feature(ca, ca.objects.counties))
+      .datum(topojson.feature(mo, mo.objects.counties))
       .attr("d", path);
 
   // Group tracts by color for faster rendering.
@@ -120,11 +202,14 @@ d3.json("MO.json", function(error, ca) {
 
   // Draw county borders.
   svg.append("path")
-      .datum(topojson.mesh(ca, ca.objects.counties, function(a, b) { return a !== b; }))
+      .datum(topojson.mesh(mo, mo.objects.counties, function(a, b) { return a !== b; }))
       .attr("class", "county-border")
       .attr("d", path);
 });
+    }
 
 d3.select(self.frameElement).style("height", height + "px");
-
 </script>
+    <p>Omar Qureshi<br>Instructor: Suresh Lodha<br>CMPS 165: Data Programming for Visualization<br>Fall 2016</p>
+    <p><a href="http://chimera.labs.oreilly.com/books/1230000000345/index.html"</a> Github Repo Link</p>
+    <p> <a href="www.google.com"</a>Github Visualization Link</p>
