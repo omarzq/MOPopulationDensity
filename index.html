@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <head>
-    <h1>Missouri Population Density</h1>
+    <h1 style = "text-align:center"><strong>Missouri Population Density</strong></h1>
 </head>
 <style>
 
@@ -27,9 +27,20 @@ svg {
   stroke: #000;
   stroke-opacity: .3;
 }
+    
+.state-border {
+  fill: none;
+  stroke: #000;
+  stroke-opacity: .9;
+}
 </style>
 <body>
-<button onclick="changeColor()">Change Color</button>  <!--Create button that calls function to change color -->
+    <div>
+        <button onclick="changeColor()">Change Color</button>  <!--Create button that calls function to change color -->
+        <button onclick="showTracts()">Show Tracts</button>
+        <button onclick="showBorder()">Show Border</button>
+    </div>
+
 <script src="//d3js.org/d3.v3.min.js"></script>
 <script src="//d3js.org/topojson.v1.min.js"></script>
 <script>
@@ -43,8 +54,8 @@ var projection = d3.geo.albers()
     .center([0, 30])
     .rotate([93, 0])
     .parallels([50, 60])
-    .scale(9000)    //size of the map
-    .translate([width / 2 - 100, height / 2 + 1300]); //repositioning the map
+    .scale(8000)    //size of the map
+    .translate([width / 2 - 100, height / 2 + 1100]); //repositioning the map
     
 var path = d3.geo.path()
     .projection(projection);
@@ -53,30 +64,9 @@ var color = d3.scale.threshold()
     .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
     .range(["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#b30000", "#7f0000"]);
     
-    var count = 0;
-function changeColor() {
-    /* Function that changes color. Since I have 3 color options, I created a 
-    variable that starts at 0 and is incremented everytime the user clicks 
-    the button. The color is cycled by using the modulus operator */
-    if(count % 3 == 0){
-    color = d3.scale.threshold()
-    .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
-    .range(["#108926", "#159f2e", "#16df3a", "#60f26a", "#f6f66a", "#eaf908", "#f7812b", "#da4d07", "#da0707"]);
-    }
-    if(count % 3 == 1) {
-    color = d3.scale.threshold()
+var colorBlue = d3.scale.threshold()
     .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
     .range(["#f8f9ff", "#a5b2f7", "#b5c1fa", "#90a2fb", "#5b76ff", "#3658ff", "#0d35fe", "#0221bb", "#010a37"]);
-    }
-    if(count % 3 == 2) {
-    color = d3.scale.threshold()
-    .domain([1, 10, 50, 100, 500, 1000, 2000, 5000])
-    .range(["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#b30000", "#7f0000"]);
-    }
-    console.log(count);
-    count++; //increment the count
-    drawMap(); //redraw the map with new colors
-}
 
 // A position encoding for the key only.
 var x = d3.scale.linear()
@@ -93,7 +83,8 @@ var xAxis = d3.svg.axis()
 var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
-    var g = svg.append("g")
+    
+var g = svg.append("g")
     .attr("class", "key")
     .attr("transform", "translate(40,40)");
 
@@ -130,11 +121,25 @@ d3.json("MO.json", function(error, mo) {
 
   // Group tracts by color for faster rendering.
   svg.append("g")
-      .attr("class", "tract")
-      .attr("clip-path", "url(#clip-land)")
+        .attr("id", "red")
+        .attr("class", "tract")
+        .attr("clip-path", "url(#clip-land)")
     .selectAll("path")
-      .data(d3.nest()
+        .data(d3.nest()
         .key(function(d) { return color(d.properties.population / d.properties.area * 2.58999e6); })
+        .entries(tracts.features.filter(function(d) { return d.properties.area; })))
+    .enter().append("path")
+      .style("fill", function(d) { return d.key; })
+      .attr("d", function(d) { return path({type: "FeatureCollection", features: d.values}); });
+    
+     svg.append("g")
+        .attr("opacity", 0)
+        .attr("id", "blue")
+        .attr("class", "tract")
+        .attr("clip-path", "url(#clip-land)")
+    .selectAll("path")
+        .data(d3.nest()
+        .key(function(d) { return colorBlue(d.properties.population / d.properties.area * 2.58999e6); })
         .entries(tracts.features.filter(function(d) { return d.properties.area; })))
     .enter().append("path")
       .style("fill", function(d) { return d.key; })
@@ -145,65 +150,95 @@ d3.json("MO.json", function(error, mo) {
       .datum(topojson.mesh(mo, mo.objects.counties, function(a, b) { return a !== b; }))
       .attr("class", "county-border")
       .attr("d", path);
-});
     
-function drawMap(){ //fucntion that redraws the map
-        var g = svg.append("g")
-            .attr("class", "key")
-            .attr("transform", "translate(40,40)");
-
+    //draw tracts
+    svg.append("path")
+        .attr("id", "tracts")
+        .datum(topojson.mesh(mo, mo.objects.tracts, function(a, b) { return a !== b; }))
+        .attr("class", "county-border")
+        .attr("d", path);
+    
+    //draw state borders
+    svg.append("path")
+        .attr("id", "border")
+        .datum(topojson.mesh(mo, mo.objects.tracts, function(a, b) { return a === b; }))
+        .attr("class", "state-border")
+        .attr("d", path);
+});
+        
+var colorcount = 0;
+    //Change colors
+function changeColor() {
+if(colorcount % 2 == 0){    //sets opacity of the svg element with id 'blue' or 'red'
+    //if the counter of the color is even, it will be red. Otherwise it will be blue
+    svg.selectAll("#red")
+        .attr("opacity", 0);
+    svg.selectAll("#blue")
+        .attr("opacity", 1);
+    }
+    else{
+        svg.selectAll("#red")
+            .attr("opacity", 1);
+        svg.selectAll("#blue")
+            .attr("opacity", 0);
+    }; 
+    //Redraw the legend with proper colors, using the same method to change map colors.
+    if(colorcount % 2 == 0){
         g.selectAll("rect")
-            .data(color.range().map(function(d, i) {
-            return {
-                x0: i ? x(color.domain()[i - 1]) : x.range()[0],
-                x1: i < color.domain().length ? x(color.domain()[i]) : x.range()[1],
-                z: d
-            };
-        }))
-            .enter().append("rect")
-            .attr("height", 8)
-            .attr("x", function(d) { return d.x0; })
-            .attr("width", function(d) { return d.x1 - d.x0; })
-            .style("fill", function(d) { return d.z; });
-
-        g.call(xAxis).append("text")
-            .attr("class", "caption")
-            .attr("y", -6)
-            .text("Population per square mile");
-
-        d3.json("MO.json", function(error, mo) {
-            if (error) throw error;
-            
-            var tracts = topojson.feature(mo, mo.objects.tracts);
-
-            // Clip tracts to land.
-        svg.append("defs").append("clipPath")
-            .attr("id", "clip-land")
-            .append("path")
-            .datum(topojson.feature(mo, mo.objects.counties))
-            .attr("d", path);
-
-        // Group tracts by color for faster rendering.
-        svg.append("g")
-            .attr("class", "tract")
-            .attr("clip-path", "url(#clip-land)")
-            .selectAll("path")
-            .data(d3.nest()
-                  .key(function(d) { return color(d.properties.population / d.properties.area * 2.58999e6); })
-                  .entries(tracts.features.filter(function(d) { return d.properties.area; })))
-            .enter().append("path")
-            .style("fill", function(d) { return d.key; })
-            .attr("d", function(d) { return path({type: "FeatureCollection", features: d.values}); });
-
-  // Draw county borders.
-        svg.append("path")
-            .datum(topojson.mesh(mo, mo.objects.counties, function(a, b) { return a !== b; }))
-            .attr("class", "county-border")
-            .attr("d", path);
-        });
+            .data(colorBlue.range().map(function(d, i) {
+                return {
+                    x0: i ? x(colorBlue.domain()[i - 1]) : x.range()[0],
+                    x1: i < colorBlue.domain().length ? x(colorBlue.domain()[i]) : x.range()[1],
+                    z: d
+                };
+            }))
+        .style("fill", function(d) {return d.z; });
+    }
+    else{
+         g.selectAll("rect")
+        .data(color.range().map(function(d, i) {
+                return {
+                    x0: i ? x(color.domain()[i - 1]) : x.range()[0],
+                    x1: i < color.domain().length ? x(color.domain()[i]) : x.range()[1],
+                    z: d
+                };
+            }))
+     .style("fill", function(d) {return d.z; });
+    }
+    
+    
+    colorcount++; //increment the count
 }
-
-d3.select(self.frameElement).style("height", height + "px");
+var tractscount = 0;
+ function showTracts()
+    {
+        if(tractscount % 2 == 0){
+            svg.selectAll("#tracts")
+                .attr("opacity", 0);
+            }
+        else {
+            svg.selectAll("#tracts")
+                .attr("opacity", 1);
+        }
+        console.log(tractscount);
+        tractscount++;
+    }
+    
+var bordercount = 0;
+ function showBorder()
+    {
+        if(bordercount % 2 == 0){
+            svg.selectAll("#border")
+                .attr("opacity", 0);
+            }
+        else {
+            svg.selectAll("#border")
+                .attr("opacity", 1);
+        }
+        console.log(bordercount);
+        bordercount++;
+    }
+d3.select(self.frameElement).style("height", height + "px");   
 </script>
     <p>Omar Qureshi<br>Instructor: Suresh Lodha<br>CMPS 165: Data Programming for Visualization<br>Fall 2016</p>
     <p><a href="https://github.com/omarzq/MOPopulationDensity"</a> Github Repo Link</p> 
